@@ -1414,6 +1414,19 @@ static void build_subroutines(BuildCtx *ctx)
   |  movsd xmm0, qword [BASE+8]
   |.endif
   |  mov PC, [BASE-8]
+#if LJ_ZERO_BASED
+  |.if DUALNUM
+  |  mov TMPRd, RAd
+  |  add TMPRd, 1
+  |  setint ITYPE, TMPR
+  |  mov [BASE-16], ITYPE
+  |.else
+  |  cvttsd2si RAd, xmm0
+  |  sseconst_1 xmm1, TMPR
+  |  addsd xmm0, xmm1
+  |  movsd qword [BASE-16], xmm0
+  |.endif
+#else
   |.if DUALNUM
   |  add RAd, 1
   |  setint ITYPE, RA
@@ -1424,6 +1437,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  cvttsd2si RAd, xmm0
   |  movsd qword [BASE-16], xmm0
   |.endif
+#endif
   |  cmp RAd, TAB:RB->asize;  jae >2	// Not in array part?
   |  mov RD, TAB:RB->array
   |  lea RD, [RD+RA*8]
@@ -4405,6 +4419,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ucomisd xmm1, xmm0
     |1:
     |  movsd qword FOR_EXT, xmm0
+#if LJ_ZERO_BASED
+    if (op == BC_FORI) {
+      |.if DUALNUM
+      |  jnbe <7
+      |.else
+      |  jnbe >2
+      |  branchPC RD
+      |.endif
+    } else if (op == BC_JFORI) {
+      |  branchPC RD
+      |  movzx RDd, PC_RD
+      |  jnbe =>BC_JLOOP
+    } else if (op == BC_IFORL) {
+      |.if DUALNUM
+      |  jbe <7
+      |.else
+      |  jbe >2
+      |  branchPC RD
+      |.endif
+    } else {
+      |  jnbe =>BC_JLOOP
+    }
+#else
     if (op == BC_FORI) {
       |.if DUALNUM
       |  jnb <7
@@ -4426,6 +4463,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     } else {
       |  jnb =>BC_JLOOP
     }
+#endif
     |.if DUALNUM
     |  jmp <6
     |.else

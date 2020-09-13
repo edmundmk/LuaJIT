@@ -1722,7 +1722,7 @@ static void expr_table(LexState *ls, ExpDesc *e)
   BCLine line = ls->linenumber;
   GCtab *t = NULL;
   int vcall = 0, needarr = 0, fixt = 0;
-  uint32_t narr = 1;  /* First array index. */
+  uint32_t narr = LJ_ZERO_BASED ? 0 : 1;  /* First array index. */
   uint32_t nhash = 0;  /* Number of hash entries. */
   BCReg freg = fs->freereg;
   BCPos pc = bcemit_AD(fs, BC_TNEW, freg, 0);

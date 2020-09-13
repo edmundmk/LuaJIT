@@ -394,6 +394,21 @@ static LoopEvent rec_for_iter(IROp *op, cTValue *o, int isforl)
   lua_Number stepv = numberVnum(&o[FORL_STEP]);
   if (isforl)
     idxv += stepv;
+#if LJ_ZERO_BASED
+  if (rec_for_direction(&o[FORL_STEP])) {
+    if (idxv < stopv) {
+      *op = IR_LT;
+      return idxv + 2*stepv >= stopv ? LOOPEV_ENTERLO : LOOPEV_ENTER;
+    }
+    *op = IR_GE; return LOOPEV_LEAVE;
+  } else {
+    if (stopv < idxv) {
+      *op = IR_GT;
+      return idxv + 2*stepv <= stopv ? LOOPEV_ENTERLO : LOOPEV_ENTER;
+    }
+    *op = IR_LE; return LOOPEV_LEAVE;
+  }
+#else
   if (rec_for_direction(&o[FORL_STEP])) {
     if (idxv <= stopv) {
       *op = IR_LE;
@@ -407,12 +422,15 @@ static LoopEvent rec_for_iter(IROp *op, cTValue *o, int isforl)
     }
     *op = IR_LT; return LOOPEV_LEAVE;
   }
+#endif
 }
 
 /* Record checks for FOR loop overflow and step direction. */
 static void rec_for_check(jit_State *J, IRType t, int dir,
 			  TRef stop, TRef step, int init)
 {
+  IROp lop = LJ_ZERO_BASED ? IR_LT : IR_LE;
+  IROp gop = LJ_ZERO_BASED ? IR_GT : IR_GE;
   if (!tref_isk(step)) {
     /* Non-constant step: need a guard for the direction. */
     TRef zero = (t == IRT_INT) ? lj_ir_kint(J, 0) : lj_ir_knum_zero(J);
@@ -424,10 +442,10 @@ static void rec_for_check(jit_State *J, IRType t, int dir,
 	int32_t k = IR(tref_ref(stop))->i;
 	if (dir) {
 	  if (k > 0)
-	    emitir(IRTGI(IR_LE), step, lj_ir_kint(J, (int32_t)0x7fffffff-k));
+	    emitir(IRTGI(lop), step, lj_ir_kint(J, (int32_t)0x7fffffff-k));
 	} else {
 	  if (k < 0)
-	    emitir(IRTGI(IR_GE), step, lj_ir_kint(J, (int32_t)0x80000000-k));
+	    emitir(IRTGI(gop), step, lj_ir_kint(J, (int32_t)0x80000000-k));
 	}
       } else {
 	/* Stop+step variable: need full overflow check. */
@@ -439,7 +457,7 @@ static void rec_for_check(jit_State *J, IRType t, int dir,
     /* Constant step: optimize overflow check to a range check for stop. */
     int32_t k = IR(tref_ref(step))->i;
     k = (int32_t)(dir ? 0x7fffffff : 0x80000000) - k;
-    emitir(IRTGI(dir ? IR_LE : IR_GE), stop, lj_ir_kint(J, k));
+    emitir(IRTGI(dir ? lop : gop), stop, lj_ir_kint(J, k));
   }
 }
 

@@ -652,9 +652,15 @@ LJ_NOINLINE static MSize tab_len_slow(GCtab *t, size_t hi)
     lo = hi;
     hi += hi;
     if (hi > (size_t)(INT_MAX-2)) {  /* Punt and do a linear search. */
+#if LJ_ZERO_BASED
+      lo = 0;
+      while ((tv = lj_tab_getint(t, (int32_t)lo)) && !tvisnil(tv)) lo++;
+      return (MSize)lo;
+#else
       lo = 1;
       while ((tv = lj_tab_getint(t, (int32_t)lo)) && !tvisnil(tv)) lo++;
       return (MSize)(lo - 1);
+#endif
     }
   }
   /* Binary search to find a non-nil to nil transition. */
@@ -663,12 +669,34 @@ LJ_NOINLINE static MSize tab_len_slow(GCtab *t, size_t hi)
     cTValue *tvb = lj_tab_getint(t, (int32_t)mid);
     if (tvb && !tvisnil(tvb)) lo = mid; else hi = mid;
   }
+#if LJ_ZERO_BASED
+  return (MSize)hi;
+#else
   return (MSize)lo;
+#endif
 }
 
 /* Compute table length. Fast path. */
 MSize LJ_FASTCALL lj_tab_len(GCtab *t)
 {
+#if LJ_ZERO_BASED
+  size_t hi = (size_t)t->asize;
+  if (hi) { /* Array part is not empty. */
+    hi--;
+    /* In a growing array the last array element is very likely nil. */
+    if (LJ_LIKELY(tvisnil(arrayslot(t, hi)))) {
+      /* Binary search to find a non-nil to nil transition in the array. */
+      size_t lo = 0;
+      while (hi - lo > 1) {
+        size_t mid = (lo+hi) >> 1;
+        if (tvisnil(arrayslot(t, mid))) hi = mid; else lo = mid;
+      }
+      return (MSize)hi;
+    }
+  }
+  /* Without a hash part, there's an implicit nil after the last element. */
+  return t->hmask ? tab_len_slow(t, hi) : (MSize)t->asize;
+#else
   size_t hi = (size_t)t->asize;
   if (hi) hi--;
   /* In a growing array the last array element is very likely nil. */
@@ -683,6 +711,7 @@ MSize LJ_FASTCALL lj_tab_len(GCtab *t)
   }
   /* Without a hash part, there's an implicit nil after the last element. */
   return t->hmask ? tab_len_slow(t, hi) : (MSize)hi;
+#endif
 }
 
 #if LJ_HASJIT
@@ -691,11 +720,19 @@ MSize LJ_FASTCALL lj_tab_len_hint(GCtab *t, size_t hint)
 {
   size_t asize = (size_t)t->asize;
   cTValue *tv = arrayslot(t, hint);
+#if LJ_ZERO_BASED
+  if (LJ_LIKELY(hint == 0 || tvisnil(tv-1))) {
+    if (LJ_LIKELY(hint < asize) || (hint <= asize && LJ_LIKELY(t->hmask == 0))) {
+      return (MSize)hint;
+    }
+  }
+#else
   if (LJ_LIKELY(hint+1 < asize)) {
     if (LJ_LIKELY(!tvisnil(tv) && tvisnil(tv+1))) return (MSize)hint;
   } else if (hint+1 <= asize && LJ_LIKELY(t->hmask == 0) && !tvisnil(tv)) {
     return (MSize)hint;
   }
+#endif
   return lj_tab_len(t);
 }
 #endif

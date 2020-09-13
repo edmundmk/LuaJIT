@@ -639,6 +639,13 @@ extern void *LJ_WIN_LOADLIBA(const char *path);
 #define LJ_52			0
 #endif
 
+/* Zero-based indexing. */
+#ifdef LUAJIT_ZERO_BASED_INDEXING
+#define LJ_ZERO_BASED		1
+#else
+#define LJ_ZERO_BASED		0
+#endif
+
 /* -- VM security --------------------------------------------------------- */
 
 /* Don't make any changes here. Instead build with:
