@@ -221,14 +221,21 @@ LJLIB_CF(rawlen)		LJLIB_REC(.)
 LJLIB_CF(unpack)
 {
   GCtab *t = lj_lib_checktab(L, 1);
-  int32_t n, i = lj_lib_optint(L, 2, 1);
+  int32_t n, i = lj_lib_optint(L, 2, LJ_ZERO_BASED ? 0 : 1);
   int32_t e = (L->base+3-1 < L->top && !tvisnil(L->base+3-1)) ?
 	      lj_lib_checkint(L, 3) : (int32_t)lj_tab_len(t);
   uint32_t nu;
+#if LJ_ZERO_BASED
+  if (i >= e) return 0;
+  nu = (uint32_t)e - (uint32_t)i;
+  n = (int32_t)nu;
+  if (nu > LUAI_MAXCSTACK || !lua_checkstack(L, n))
+#else
   if (i > e) return 0;
   nu = (uint32_t)e - (uint32_t)i;
   n = (int32_t)(nu+1);
   if (nu >= LUAI_MAXCSTACK || !lua_checkstack(L, n))
+#endif
     lj_err_caller(L, LJ_ERR_UNPACK);
   do {
     cTValue *tv = lj_tab_getint(t, i);
@@ -237,7 +244,11 @@ LJLIB_CF(unpack)
     } else {
       setnilV(L->top++);
     }
+#if LJ_ZERO_BASED
+  } while (++i < e);
+#else
   } while (i++ < e);
+#endif
   return n;
 }
 
