@@ -88,9 +88,15 @@ LJLIB_ASM(string_char)		LJLIB_REC(.)
 
 LJLIB_ASM(string_sub)		LJLIB_REC(string_range 1)
 {
+#if LJ_ZERO_BASED
+  GCstr *s = lj_lib_checkstr(L, 1);
+  lj_lib_checkint(L, 2);
+  setintV(L->base+2, lj_lib_optint(L, 3, (int32_t)s->len));
+#else
   lj_lib_checkstr(L, 1);
   lj_lib_checkint(L, 2);
   setintV(L->base+2, lj_lib_optint(L, 3, -1));
+#endif
   return FFH_RETRY;
 }
 
