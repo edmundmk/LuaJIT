@@ -1947,6 +1947,64 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov [BASE-16], STR:RD
   |  jmp ->fff_res1
   |
+#if LJ_ZERO_BASED
+  |.ffunc string_sub
+  |  ffgccheck
+  |  cmp NARGS:RDd, 1+2;  jb ->fff_fallback
+  |  mov STR:RB, [BASE]			// First argument is s
+  |  checkstr STR:RB, ->fff_fallback
+  |  mov RAd, STR:RB->len
+  |  mov TMPRd, RAd			// By default, end = len
+  |  cmp NARGS:RDd, 1+2;
+  |  jna >1
+  |.if DUALNUM				// Third argument is end
+  |  mov TMPR, [BASE+16]
+  |  checkint TMPR, ->fff_fallback
+  |.else
+  |  checknumtp [BASE+16], ->fff_fallback
+  |  cvttsd2si TMPRd, qword [BASE+16]
+  |.endif
+  |  cmp RAd, TMPRd 			// len < end? (unsigned compare)
+  |  jb >5
+  |1:
+  |.if DUALNUM				// Second argument is start
+  |  mov ITYPE, [BASE+8]
+  |  mov RCd, ITYPEd			// Must clear hiword for lea below.
+  |  sar ITYPE, 47
+  |  cmp ITYPEd, LJ_TISNUM
+  |  jne ->fff_fallback
+  |.else
+  |  checknumtp [BASE+8], ->fff_fallback
+  |  cvttsd2si RCd, qword [BASE+8]
+  |.endif
+  |  test RCd, RCd			// start < 0?
+  |  jl >7
+  |2:
+  |  sub TMPRd, RCd 			// end = end-start; end < 0?
+  |  jl ->fff_emptystr
+  |3:
+  |  lea RD, [STR:RB+RCd+#STR]
+  |4:
+  |  jmp ->fff_newstr
+  |
+  |5:  // Negative end or overflow.
+  |  jl >6				// len < end? (signed compare)
+  |  add TMPRd, RAd 			// end = end+len
+  |  jmp <1
+  |6:  // Overflow.
+  |  mov TMPRd, RAd 			// end = len
+  |  jmp <1
+  |
+  |7:  // Negative start or underflow.
+  |  add RCd, RAd			// start = start+len
+  |  jge <2				// start >= 0?
+  |  mov RCd, 0				// start = 0
+  |  jmp <2
+  |
+  |->fff_emptystr:  // Empty string.
+  |  xor TMPRd, TMPRd
+  |  jmp <4
+#else
   |.ffunc string_sub
   |  ffgccheck
   |  mov TMPRd, -1
@@ -2006,6 +2064,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->fff_emptystr:  // Range underflow.
   |  xor TMPRd, TMPRd			// Zero length. Any ptr in RD is ok.
   |  jmp <4
+#endif
   |
   |.macro ffstring_op, name
   |  .ffunc_1 string_ .. name

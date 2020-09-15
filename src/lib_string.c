@@ -43,16 +43,18 @@ LJLIB_ASM(string_byte)		LJLIB_REC(string_range 0)
   GCstr *s = lj_lib_checkstr(L, 1);
   int32_t len = (int32_t)s->len;
   int32_t start = lj_lib_optint(L, 2, LJ_ZERO_BASED ? 0 : 1);
-  int32_t stop = lj_lib_optint(L, 3, LJ_ZERO_BASED ? start+1 : start);
+  int32_t stop;
   int32_t n, i;
   const unsigned char *p;
 #if LJ_ZERO_BASED
+  if (start < 0) start += len;
+  stop = lj_lib_optint(L, 3, start+1);
   if (stop < 0) stop += len;
-  if (start < 0 ) start += len;
-  if (start <= 0) start = 0;
+  if (start < 0) start = 0;
   if (stop > len) stop = len;
   if (start >= stop) return FFH_RES(0);  /* Empty interval: return no results. */
 #else
+  stop = lj_lib_optint(L, 3, start);
   if (stop < 0) stop += len+1;
   if (start < 0) start += len+1;
   if (start <= 0) start = 1;
@@ -466,8 +468,8 @@ static int str_find_aux(lua_State *L, int find)
 #if !LJ_ZERO_BASED
   } else {
     start--;
-  }
 #endif
+  }
   if (start < 0) start = 0;
   st = (MSize)start;
   if (st > s->len) {
