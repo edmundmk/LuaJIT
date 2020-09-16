@@ -742,9 +742,11 @@ static TRef recff_string_start(jit_State *J, GCstr *s, int32_t *st, TRef tr,
     emitir(IRTGI(IR_EQ), tr, tr0);
     tr = tr0;
   } else {
+#if !LJ_ZERO_BASED
     tr = emitir(IRTI(IR_ADD), tr, lj_ir_kint(J, -1));
-    emitir(IRTGI(IR_GE), tr, tr0);
     start--;
+#endif
+    emitir(IRTGI(IR_GE), tr, tr0);
   }
   *st = start;
   return tr;
@@ -896,8 +898,8 @@ static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
   int32_t start;
   J->needsnap = 1;
   if (tref_isnil(J->base[2])) {
-    trstart = lj_ir_kint(J, 1);
-    start = 1;
+    start = LJ_ZERO_BASED ? 0 : 1;
+    trstart = lj_ir_kint(J, start);
   } else {
     trstart = lj_opt_narrow_toint(J, J->base[2]);
     start = argv2int(J, &rd->argv[2]);
