@@ -170,7 +170,11 @@ SBuf *lj_buf_putstr_rep(SBuf *sb, GCstr *s, int32_t rep)
 SBuf *lj_buf_puttab(SBuf *sb, GCtab *t, GCstr *sep, int32_t i, int32_t e)
 {
   MSize seplen = sep ? sep->len : 0;
+#if LJ_ZERO_BASED
+  if (i < e) {
+#else
   if (i <= e) {
+#endif
     for (;;) {
       cTValue *o = lj_tab_getint(t, i);
       char *p;
@@ -188,10 +192,16 @@ SBuf *lj_buf_puttab(SBuf *sb, GCtab *t, GCstr *sep, int32_t i, int32_t e)
       } else {
 	goto badtype;
       }
-      if (i++ == e) {
+#if LJ_ZERO_BASED
+      ++i;
+#endif
+      if (i == e) {
 	setsbufP(sb, p);
 	break;
       }
+#if !LJ_ZERO_BASED
+      ++i;
+#endif
       if (seplen) p = lj_buf_wmem(p, strdata(sep), seplen);
       setsbufP(sb, p);
     }

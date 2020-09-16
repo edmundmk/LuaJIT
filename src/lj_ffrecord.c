@@ -1033,9 +1033,13 @@ static void LJ_FASTCALL recff_table_insert(jit_State *J, RecordFFData *rd)
     if (!J->base[2]) {  /* Simple push: t[#t+1] = v */
       TRef trlen = emitir(IRTI(IR_ALEN), ix.tab, TREF_NIL);
       GCtab *t = tabV(&rd->argv[0]);
+#if LJ_ZERO_BASED
+      ix.key = trlen;
+#else
       ix.key = emitir(IRTI(IR_ADD), trlen, lj_ir_kint(J, 1));
+#endif
       settabV(J->L, &ix.tabv, t);
-      setintV(&ix.keyv, lj_tab_len(t) + 1);
+      setintV(&ix.keyv, lj_tab_len(t) + (LJ_ZERO_BASED ? 0 : 1));
       ix.idxchain = 0;
       lj_record_idx(J, &ix);  /* Set new value. */
     } else {  /* Complex case: insert in the middle. */
@@ -1052,7 +1056,7 @@ static void LJ_FASTCALL recff_table_concat(jit_State *J, RecordFFData *rd)
     TRef sep = !tref_isnil(J->base[1]) ?
 	       lj_ir_tostr(J, J->base[1]) : lj_ir_knull(J, IRT_STR);
     TRef tri = (J->base[1] && !tref_isnil(J->base[2])) ?
-	       lj_opt_narrow_toint(J, J->base[2]) : lj_ir_kint(J, 1);
+	       lj_opt_narrow_toint(J, J->base[2]) : lj_ir_kint(J, LJ_ZERO_BASED ? 0 : 1);
     TRef tre = (J->base[1] && J->base[2] && !tref_isnil(J->base[3])) ?
 	       lj_opt_narrow_toint(J, J->base[3]) :
 	       emitir(IRTI(IR_ALEN), tab, TREF_NIL);
