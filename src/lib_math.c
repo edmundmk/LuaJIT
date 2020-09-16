@@ -151,7 +151,11 @@ LJLIB_CF(math_random)		LJLIB_REC(.)
     double r1 = lj_lib_checknum(L, 1);
 #endif
     if (n == 1) {
+#if LJ_ZERO_BASED
+      d = lj_vm_floor(d*r1); /* d is an int in range [0, r1) */
+#else
       d = lj_vm_floor(d*r1) + 1.0;  /* d is an int in range [1, r1] */
+#endif
     } else {
 #if LJ_DUALNUM
       double r2;
@@ -165,7 +169,11 @@ LJLIB_CF(math_random)		LJLIB_REC(.)
 #else
       double r2 = lj_lib_checknum(L, 2);
 #endif
+#if LJ_ZERO_BASED
+      d = lj_vm_floor(d*(r2-r1)) + r1; /* d is an int in range [r1, r2) */
+#else
       d = lj_vm_floor(d*(r2-r1+1.0)) + r1;  /* d is an int in range [r1, r2] */
+#endif
     }
 #if LJ_DUALNUM
     if (isint) {

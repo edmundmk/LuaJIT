@@ -629,14 +629,18 @@ static void LJ_FASTCALL recff_math_random(jit_State *J, RecordFFData *rd)
     if (J->base[1]) {  /* d = floor(d*(r2-r1+1.0)) + r1 */
       TRef tr2 = lj_ir_tonum(J, J->base[1]);
       tr2 = emitir(IRTN(IR_SUB), tr2, tr1);
+#if !LJ_ZERO_BASED
       tr2 = emitir(IRTN(IR_ADD), tr2, one);
+#endif
       tr = emitir(IRTN(IR_MUL), tr, tr2);
       tr = emitir(IRTN(IR_FPMATH), tr, IRFPM_FLOOR);
       tr = emitir(IRTN(IR_ADD), tr, tr1);
     } else {  /* d = floor(d*r1) + 1.0 */
       tr = emitir(IRTN(IR_MUL), tr, tr1);
       tr = emitir(IRTN(IR_FPMATH), tr, IRFPM_FLOOR);
+#if !LJ_ZERO_BASED
       tr = emitir(IRTN(IR_ADD), tr, one);
+#endif
     }
   }
   J->base[0] = tr;
