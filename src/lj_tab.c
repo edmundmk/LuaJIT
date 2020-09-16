@@ -646,7 +646,9 @@ LJ_NOINLINE static MSize tab_len_slow(GCtab *t, size_t hi)
 {
   cTValue *tv;
   size_t lo = hi;
+#if !LJ_ZERO_BASED
   hi++;
+#endif
   /* Widening search for an upper bound. */
   while ((tv = lj_tab_getint(t, (int32_t)hi)) && !tvisnil(tv)) {
     lo = hi;
@@ -681,18 +683,16 @@ MSize LJ_FASTCALL lj_tab_len(GCtab *t)
 {
 #if LJ_ZERO_BASED
   size_t hi = (size_t)t->asize;
-  if (hi) { /* Array part is not empty. */
+  /* In a growing array the last array element is very likely nil. */
+  if (hi > 0 && LJ_LIKELY(tvisnil(arrayslot(t, hi-1)))) {
+    /* Binary search to find a non-nil to nil transition in the array. */
     hi--;
-    /* In a growing array the last array element is very likely nil. */
-    if (LJ_LIKELY(tvisnil(arrayslot(t, hi)))) {
-      /* Binary search to find a non-nil to nil transition in the array. */
-      size_t lo = 0;
-      while (hi - lo > 1) {
-        size_t mid = (lo+hi) >> 1;
-        if (tvisnil(arrayslot(t, mid))) hi = mid; else lo = mid;
-      }
-      return (MSize)hi;
+    size_t lo = 0;
+    while (hi - lo > 1) {
+      size_t mid = (lo+hi) >> 1;
+      if (tvisnil(arrayslot(t, mid))) hi = mid; else lo = mid;
     }
+    return (MSize)hi;
   }
   /* Without a hash part, there's an implicit nil after the last element. */
   return t->hmask ? tab_len_slow(t, hi) : (MSize)t->asize;
