@@ -766,16 +766,21 @@ static void LJ_FASTCALL recff_string_range(jit_State *J, RecordFFData *rd)
     trstart = lj_opt_narrow_toint(J, J->base[1]);
     trend = J->base[2];
     if (tref_isnil(trend)) {
+#if LJ_ZERO_BASED
+      trend = trlen;
+      end = (int32_t)str->len;
+#else
       trend = lj_ir_kint(J, -1);
       end = -1;
+#endif
     } else {
       trend = lj_opt_narrow_toint(J, trend);
       end = argv2int(J, &rd->argv[2]);
     }
   } else {  /* string.byte(str, [,start [,end]]) */
     if (tref_isnil(J->base[1])) {
-      start = 1;
-      trstart = lj_ir_kint(J, 1);
+      start = LJ_ZERO_BASED ? 0 : 1;
+      trstart = lj_ir_kint(J, start);
     } else {
       start = argv2int(J, &rd->argv[1]);
       trstart = lj_opt_narrow_toint(J, J->base[1]);
@@ -784,15 +789,23 @@ static void LJ_FASTCALL recff_string_range(jit_State *J, RecordFFData *rd)
       trend = lj_opt_narrow_toint(J, J->base[2]);
       end = argv2int(J, &rd->argv[2]);
     } else {
+#if LJ_ZERO_BASED
+      trend = emitir(IRTI(IR_ADD), trlen, lj_ir_kint(J, 1));
+      end = start+1;
+#else
       trend = trstart;
       end = start;
+#endif
     }
   }
   if (end < 0) {
     emitir(IRTGI(IR_LT), trend, tr0);
-    trend = emitir(IRTI(IR_ADD), emitir(IRTI(IR_ADD), trlen, trend),
-		   lj_ir_kint(J, 1));
-    end = end+(int32_t)str->len+1;
+    trend = emitir(IRTI(IR_ADD), trlen, trend);
+    end = end+(int32_t)str->len;
+#if !LJ_ZERO_BASED
+    trend = emitir(IRTI(IR_ADD), trend, lj_ir_kint(J, 1));
+    end = end+1;
+#endif
   } else if ((MSize)end <= str->len) {
     emitir(IRTGI(IR_ULE), trend, trlen);
   } else {
