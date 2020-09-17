@@ -260,6 +260,9 @@ LJLIB_CF(select)		LJLIB_REC(.)
     return 1;
   } else {
     int32_t i = lj_lib_checkint(L, 1);
+#if LJ_ZERO_BASED
+    if (i >= 0) i += 1;
+#endif
     if (i < 0) i = n + i; else if (i > n) i = n;
     if (i < 1)
       lj_err_arg(L, 1, LJ_ERR_IDXRNG);

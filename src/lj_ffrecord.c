@@ -301,7 +301,11 @@ int32_t lj_ffrecord_select_mode(jit_State *J, TRef tr, TValue *tv)
     return 0;
   } else {  /* select(n, ...) */
     int32_t start = argv2int(J, tv);
+#if LJ_ZERO_BASED
+    if (start >= 0) start += 1;
+#else
     if (start == 0) lj_trace_err(J, LJ_TRERR_BADTYPE);  /* A bit misleading. */
+#endif
     return start;
   }
 }
