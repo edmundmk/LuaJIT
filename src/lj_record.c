@@ -1866,28 +1866,28 @@ static void rec_varg(jit_State *J, BCReg dst, ptrdiff_t nresults)
       if (idx != 0 && !tref_isinteger(tridx))
 	tridx = emitir(IRTGI(IR_CONV), tridx, IRCONV_INT_NUM|IRCONV_INDEX);
       if (idx != 0 && tref_isk(tridx)) {
-	/* select an argument at constant position. */
+	/* Select an argument at constant position. */
 	emitir(IRTGI(idx <= nvararg ? IR_GE : IR_LT),
 	       fr, lj_ir_kint(J, frofs+8*(int32_t)idx));
 #if !LJ_ZERO_BASED
 	frofs -= 8;  /* Bias for 1-based index. */
 #endif
       } else if (idx <= nvararg) {  /* Compute size. */
-        /* selected varg exists in trace. */
+	/* Selected varg exists in trace. */
 	TRef tmp = emitir(IRTI(IR_ADD), fr, lj_ir_kint(J, -frofs));
 	if (numparams)
 	  emitir(IRTGI(IR_GE), tmp, lj_ir_kint(J, 0));
 	/* tr is number of vargs */
 	tr = emitir(IRTI(IR_BSHR), tmp, lj_ir_kint(J, 3));
 	if (idx != 0) {
-	  /* bounds check index against vargs */
+	  /* Bounds check index against vargs */
 #if !LJ_ZERO_BASED
 	  tridx = emitir(IRTI(IR_ADD), tridx, lj_ir_kint(J, -1));
 #endif
 	  rec_idx_abc(J, tr, tridx, (uint32_t)nvararg);
 	}
       } else {
-	/* selected varg is missing in trace. */
+	/* Selected varg is missing in trace. */
 	TRef tmp = lj_ir_kint(J, frofs);
 	if (idx != 0) {
 	  /* tmp is the frame offset if we had enough arguments. */
@@ -1897,11 +1897,11 @@ static void rec_varg(jit_State *J, BCReg dst, ptrdiff_t nresults)
 	  /* tr is number of vargs, i.e. zero */
 	  tr = lj_ir_kint(J, 0);
 	}
-	/* check runtime number of arguments is still fewer than required. */
+	/* Check runtime number of arguments is still fewer than required. */
 	emitir(IRTGI(LJ_ZERO_BASED ? IR_LE : IR_LT), fr, tmp);
       }
       if (idx != 0 && idx <= nvararg) {
-	/* actually reference existing varg in frame. */
+	/* Actually reference existing varg in frame. */
 	IRType t;
 	TRef aref, vbase = emitir(IRT(IR_SUB, IRT_IGC), REF_BASE, fr);
 	vbase = emitir(IRT(IR_ADD, IRT_PGC), vbase,
