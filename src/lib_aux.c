@@ -289,7 +289,11 @@ LUALIB_API int luaL_ref(lua_State *L, int t)
     lua_rawseti(L, t, FREELIST_REF);  /* (t[FREELIST_REF] = t[ref]) */
   } else {  /* no free elements */
     ref = (int)lua_objlen(L, t);
+#if LJ_ZERO_BASED
+    if (ref == 0) ref++; /* first empty slot other than zero. */
+#else
     ref++;  /* create new reference */
+#endif
   }
   lua_rawseti(L, t, ref);
   return ref;
