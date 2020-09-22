@@ -1414,19 +1414,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  movsd xmm0, qword [BASE+8]
   |.endif
   |  mov PC, [BASE-8]
-#if LJ_ZERO_BASED
-  |.if DUALNUM
-  |  mov TMPRd, RAd
-  |  add TMPRd, 1
-  |  setint ITYPE, TMPR
-  |  mov [BASE-16], ITYPE
-  |.else
-  |  cvttsd2si RAd, xmm0
-  |  sseconst_1 xmm1, TMPR
-  |  addsd xmm0, xmm1
-  |  movsd qword [BASE-16], xmm0
-  |.endif
-#else
   |.if DUALNUM
   |  add RAd, 1
   |  setint ITYPE, RA
@@ -1437,7 +1424,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  cvttsd2si RAd, xmm0
   |  movsd qword [BASE-16], xmm0
   |.endif
-#endif
   |  cmp RAd, TAB:RB->asize;  jae >2	// Not in array part?
   |  mov RD, TAB:RB->array
   |  lea RD, [RD+RA*8]
@@ -1482,12 +1468,22 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov PC, [BASE-8]
   |  mov [BASE-16], CFUNC:RD
   |  mov [BASE-8], TMPR
+#if LJ_ZERO_BASED
+  |.if DUALNUM
+  |  mov64 RD, (((uint64_t)LJ_TISNUM<<47)|((uint32_t)-1))
+  |  mov [BASE], RD
+  |.else
+  |  mov64 TMPR, U64x(bff00000,00000000) // -1.0
+  |  mov qword [BASE], TMPR
+  |.endif
+#else
   |.if DUALNUM
   |  mov64 RD, ((uint64_t)LJ_TISNUM<<47)
   |  mov [BASE], RD
   |.else
   |  mov qword [BASE], 0
   |.endif
+#endif
   |  mov RDd, 1+3
   |  jmp ->fff_res
   |
