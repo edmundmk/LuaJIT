@@ -1797,6 +1797,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov PC, [BASE-4]
   |  mov dword [BASE-4], LJ_TFUNC
   |  mov [BASE-8], CFUNC:RD
+#if LJ_ZERO_BASED
+  |.if DUALNUM
+  |  mov dword [BASE+12], LJ_TISNUM
+  |  mov dword [BASE+8], -1
+  |.else
+  |  sseconst_m1 xmm0, RDa
+  |  movsd qword [BASE+8], xmm0
+  |.endif
+#else
   |.if DUALNUM
   |  mov dword [BASE+12], LJ_TISNUM
   |  mov dword [BASE+8], 0
@@ -1804,6 +1813,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  xorps xmm0, xmm0
   |  movsd qword [BASE+8], xmm0
   |.endif
+#endif
   |  mov RD, 1+3
   |  jmp ->fff_res
   |
@@ -2338,6 +2348,69 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov [BASE-8], STR:RD
   |  jmp ->fff_res1
   |
+#if LJ_ZERO_BASED
+  |.ffunc string_sub
+  |  ffgccheck
+  |  cmp NARGS:RD, 1+2;  jb ->fff_fallback
+  |  cmp dword [BASE+4], LJ_TSTR;  jne ->fff_fallback
+  |  mov STR:RB, [BASE]			// First argument is s
+  |  mov RC, STR:RB->len		// By default, end = len
+  |  mov TMP2, RC
+  |  cmp NARGS:RD, 1+2;
+  |  jna >1
+  |  cmp dword [BASE+20], LJ_TISNUM
+  |.if DUALNUM				// Third argument is end
+  |  jne ->fff_fallback
+  |  mov RC, dword [BASE+16]
+  |.else
+  |  jae ->fff_fallback
+  |  cvttsd2si RC, qword [BASE+16]
+  |.endif
+  |  cmp TMP2, RC 			// len < end? (unsigned compare)
+  |  jb >5
+  |1:
+  |  cmp dword [BASE+12], LJ_TISNUM
+  |.if DUALNUM				// Second argument is start
+  |  jne ->fff_fallback
+  |  mov RA, dword [BASE+8]
+  |.else
+  |  jae ->fff_fallback
+  |  cvttsd2si RA, qword [BASE+8]
+  |.endif
+  |  test RA, RA			// start < 0?
+  |  jl >7
+  |2:
+  |  sub RC, RA 			// end = end-start; end < 0?
+  |  jl ->fff_emptystr
+  |3:
+  |  lea RB, [STR:RB+RA+#STR]
+  |4:
+  |.if X64				// New string length
+  |  mov TMP3, RC
+  |.else
+  |  mov ARG3, RC
+  |.endif
+  |  mov RD, RB
+  |  jmp ->fff_newstr
+  |
+  |5:  // Negative end or overflow.
+  |  jl >6				// len < end? (signed compare)
+  |  add RC, TMP2 			// end = end+len
+  |  jmp <1
+  |6:  // Overflow.
+  |  mov RC, TMP2 			// end = len
+  |  jmp <1
+  |
+  |7:  // Negative start or underflow.
+  |  add RA, TMP2			// start = start+len
+  |  jge <2				// start >= 0?
+  |  mov RA, 0				// start = 0
+  |  jmp <2
+  |
+  |->fff_emptystr:  // Empty string.
+  |  xor RC, RC
+  |  jmp <4
+#else
   |.ffunc string_sub
   |  ffgccheck
   |  mov TMP2, -1
@@ -2410,6 +2483,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->fff_emptystr:  // Range underflow.
   |  xor RC, RC				// Zero length. Any ptr in RB is ok.
   |  jmp <4
+#endif
   |
   |.macro ffstring_op, name
   |  .ffunc_1 string_ .. name
@@ -5176,6 +5250,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ucomisd xmm1, xmm0
     |1:
     |  movsd qword FOR_EXT, xmm0
+#if LJ_ZERO_BASED
+    if (op == BC_FORI) {
+      |.if DUALNUM
+      |  jnbe <7
+      |.else
+      |  jnbe >2
+      |  branchPC RD
+      |.endif
+    } else if (op == BC_JFORI) {
+      |  branchPC RD
+      |  movzx RD, PC_RD
+      |  jnbe =>BC_JLOOP
+    } else if (op == BC_IFORL) {
+      |.if DUALNUM
+      |  jbe <7
+      |.else
+      |  jbe >2
+      |  branchPC RD
+      |.endif
+    } else {
+      |  jnbe =>BC_JLOOP
+    }
+#else
     if (op == BC_FORI) {
       |.if DUALNUM
       |  jnb <7
@@ -5197,6 +5294,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     } else {
       |  jnb =>BC_JLOOP
     }
+#endif
     |.if DUALNUM
     |  jmp <6
     |.else

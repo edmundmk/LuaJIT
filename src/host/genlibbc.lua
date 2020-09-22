@@ -13,7 +13,7 @@ local bcnames = vmdef.bcnames
 
 local format = string.format
 
-local isbe = (string.byte(string.dump(function() end), 5) % 2 == 1)
+local isbe = (string.byte(string.dump(function() end), _BASE_INDEX+4) % 2 == 1)
 
 local function usage(arg)
   io.stderr:write("Usage: ", arg and arg[0] or "genlibbc",
@@ -43,6 +43,12 @@ local function read_files(names)
     fp:close()
   end
   return src
+end
+
+local function ifdef_code(code)
+  return string.gsub(code, "#if LJ_ZERO_BASED(.-)#else(.-)#endif", function(zero_based, one_based)
+    if _BASE_INDEX == 0 then return zero_based else return one_based end
+  end)
 end
 
 local function transform_lua(code)
@@ -80,8 +86,8 @@ local name2itype = {
 }
 
 local BC = {}
-for i=0,#bcnames/6-1 do
-  BC[string.gsub(string.sub(bcnames, i*6+1, i*6+6), " ", "")] = i
+for i=0,#bcnames/6-_BASE_INDEX do
+  BC[string.gsub(string.sub(bcnames, i*6+_BASE_INDEX, i*6+6), " ", "")] = i
 end
 local xop, xra = isbe and 3 or 0, isbe and 2 or 1
 local xrc, xrb = isbe and 1 or 2, isbe and 0 or 3
@@ -97,21 +103,21 @@ local function fixup_dump(dump, fixup)
   p = read_uleb128(p)
   p, sizebc = read_uleb128(p)
   local rawtab = {}
-  for i=0,sizebc-1 do
+  for i=0,sizebc-_BASE_INDEX do
     local op = p[xop]
     if op == BC.KSHORT then
       local rd = p[xrc] + 256*p[xrb]
       rd = bit.arshift(bit.lshift(rd, 16), 16)
       local f = fixup[rd]
       if f then
-	if f[1] == "CHECK" then
-	  local tp = f[2]
+	if f[_BASE_INDEX] == "CHECK" then
+	  local tp = f[_BASE_INDEX+1]
 	  if tp == "tab" then rawtab[p[xra]] = true end
 	  p[xop] = tp == "num" and BC.ISNUM or BC.ISTYPE
 	  p[xrb] = 0
 	  p[xrc] = name2itype[tp]
 	else
-	  error("unhandled fixup type: "..f[1])
+	  error("unhandled fixup type: "..f[_BASE_INDEX])
 	end
       end
     elseif op == BC.TGETV then
@@ -139,23 +145,25 @@ local function find_defs(src)
     local tcode, fixup = transform_lua(code)
     local func = assert(load(tcode, "", nil, env))()
     defs[name] = fixup_dump(string.dump(func, true), fixup)
-    defs[#defs+1] = name
+    defs[#defs+_BASE_INDEX] = name
   end
   return defs
 end
 
 local function gen_header(defs)
   local t = {}
-  local function w(x) t[#t+1] = x end
+  local function w(x) t[#t+_BASE_INDEX] = x end
   w("/* This is a generated file. DO NOT EDIT! */\n\n")
   w("static const int libbc_endian = ") w(isbe and 1 or 0) w(";\n\n")
   local s = ""
+  print( ipairs(defs) )
   for _,name in ipairs(defs) do
+    print( _, name )
     s = s .. defs[name]
   end
   w("static const uint8_t libbc_code[] = {\n")
   local n = 0
-  for i=1,#s do
+  for i=_BASE_INDEX,#s do
     local x = string.byte(s, i)
     w(x); w(",")
     n = n + (x < 10 and 2 or (x < 100 and 3 or 4))
@@ -190,7 +198,7 @@ local function write_file(name, data)
 end
 
 local outfile = parse_arg(arg)
-local src = read_files(arg)
+local src = ifdef_code(read_files(arg))
 local defs = find_defs(src)
 local hdr = gen_header(defs)
 write_file(outfile, hdr)

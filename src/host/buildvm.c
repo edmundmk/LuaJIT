@@ -331,12 +331,12 @@ static void emit_vmdef(BuildCtx *ctx)
   for (i = 0; ir_names[i]; i++) fprintf(ctx->fp, "%-6s", ir_names[i]);
   fprintf(ctx->fp, "\",\n\n");
 
-  fprintf(ctx->fp, "irfpm = { [0]=");
+  fprintf(ctx->fp, "irfpm = { %s", LJ_ZERO_BASED ? "" : "[0]=");
   for (i = 0; irfpm_names[i]; i++)
     fprintf(ctx->fp, "\"%s\", ", lower(buf, irfpm_names[i]));
   fprintf(ctx->fp, "},\n\n");
 
-  fprintf(ctx->fp, "irfield = { [0]=");
+  fprintf(ctx->fp, "irfield = { %s", LJ_ZERO_BASED ? "" : "[0]=");
   for (i = 0; irfield_names[i]; i++) {
     char *p;
     lower(buf, irfield_names[i]);
@@ -346,12 +346,12 @@ static void emit_vmdef(BuildCtx *ctx)
   }
   fprintf(ctx->fp, "},\n\n");
 
-  fprintf(ctx->fp, "ircall = {\n[0]=");
+  fprintf(ctx->fp, "ircall = {\n%s", LJ_ZERO_BASED ? "" : "[0]=");
   for (i = 0; ircall_names[i]; i++)
     fprintf(ctx->fp, "\"%s\",\n", ircall_names[i]);
   fprintf(ctx->fp, "},\n\n");
 
-  fprintf(ctx->fp, "traceerr = {\n[0]=");
+  fprintf(ctx->fp, "traceerr = {\n%s", LJ_ZERO_BASED ? "" : "[0]=");
   for (i = 0; trace_errors[i]; i++)
     fprintf(ctx->fp, "\"%s\",\n", trace_errors[i]);
   fprintf(ctx->fp, "},\n\n");
