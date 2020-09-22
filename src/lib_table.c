@@ -135,12 +135,10 @@ LJLIB_LUA(table_remove) /*
     else
       CHECK_int(pos)
       if pos >= 0 and pos < len then
-	len = len-1
 	local old = t[pos]
 	for i=pos,len do
 	  t[i] = t[i+1]
 	end
-	t[len] = nil
 	return old
       end
     end
