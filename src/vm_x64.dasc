@@ -1473,8 +1473,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov64 RD, (((uint64_t)LJ_TISNUM<<47)|((uint32_t)-1))
   |  mov [BASE], RD
   |.else
-  |  mov64 TMPR, U64x(bff00000,00000000) // -1.0
-  |  mov qword [BASE], TMPR
+  |  mov64 RD, U64x(bff00000,00000000) // -1.0
+  |  mov qword [BASE], RD
   |.endif
 #else
   |.if DUALNUM
