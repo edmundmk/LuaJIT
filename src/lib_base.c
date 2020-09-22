@@ -548,6 +548,9 @@ LJLIB_CF(print)
 LJLIB_PUSH(top-3)
 LJLIB_SET(_VERSION)
 
+LJLIB_PUSH(top-4)
+LJLIB_SET(_BASE_INDEX)
+
 #include "lj_libdef.h"
 
 /* -- Coroutine library --------------------------------------------------- */
@@ -687,6 +690,7 @@ LUALIB_API int luaopen_base(lua_State *L)
   /* NOBARRIER: Table and value are the same. */
   GCtab *env = tabref(L->env);
   settabV(L, lj_tab_setstr(L, env, lj_str_newlit(L, "_G")), env);
+  lua_pushinteger(L, LJ_ZERO_BASED ? 0 : 1);  /* top-4 */
   lua_pushliteral(L, LUA_VERSION);  /* top-3. */
   newproxy_weaktable(L);  /* top-2. */
   LJ_LIB_REG(L, "_G", base);
