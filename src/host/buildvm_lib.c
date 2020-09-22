@@ -353,7 +353,7 @@ void emit_lib(BuildCtx *ctx)
       ctx->mode == BUILD_recdef)
     fprintf(ctx->fp, "/* This is a generated file. DO NOT EDIT! */\n\n");
   else if (ctx->mode == BUILD_vmdef)
-    fprintf(ctx->fp, "ffnames = {\n[0]=\"Lua\",\n\"C\",\n");
+    fprintf(ctx->fp, "ffnames = {\n%s\"Lua\",\n\"C\",\n", LJ_ZERO_BASED ? "" : "[0]=");
   if (ctx->mode == BUILD_recdef)
     fprintf(ctx->fp, "static const uint16_t recff_idmap[] = {\n0,\n0x0100");
   recffid = ffid = FF_C+1;
@@ -385,6 +385,8 @@ void emit_lib(BuildCtx *ctx)
 	  ok = LJ_HASJIT;
 	else if (!strcmp(buf, "#if LJ_HASFFI\n"))
 	  ok = LJ_HASFFI;
+	else if (!strcmp(buf, "#if LJ_ZERO_BASED\n"))
+	  ok = LJ_ZERO_BASED;
 	else if (!strcmp(buf, "#if !LJ_ZERO_BASED\n"))
 	  ok = !LJ_ZERO_BASED;
 	if (!ok) {

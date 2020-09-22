@@ -25,6 +25,18 @@
 
 #define LJLIB_MODULE_table
 
+#if LJ_ZERO_BASED
+LJLIB_LUA(table_foreachi) /*
+  function(t, f)
+    CHECK_tab(t)
+    CHECK_func(f)
+    for i=0,#t do
+      local r = f(i, t[i])
+      if r ~= nil then return r end
+    end
+  end
+*/
+#else
 LJLIB_LUA(table_foreachi) /*
   function(t, f)
     CHECK_tab(t)
@@ -35,6 +47,7 @@ LJLIB_LUA(table_foreachi) /*
     end
   end
 */
+#endif
 
 LJLIB_LUA(table_foreach) /*
   function(t, f)
@@ -107,6 +120,33 @@ LJLIB_CF(table_insert)		LJLIB_REC(.)
   return 0;
 }
 
+#if LJ_ZERO_BASED
+LJLIB_LUA(table_remove) /*
+  function(t, pos)
+    CHECK_tab(t)
+    local len = #t
+    if pos == nil then
+      if len ~= 0 then
+	len = len-1
+	local old = t[len]
+	t[len] = nil
+	return old
+      end
+    else
+      CHECK_int(pos)
+      if pos >= 0 and pos < len then
+	len = len-1
+	local old = t[pos]
+	for i=pos,len do
+	  t[i] = t[i+1]
+	end
+	t[len] = nil
+	return old
+      end
+    end
+  end
+*/
+#else
 LJLIB_LUA(table_remove) /*
   function(t, pos)
     CHECK_tab(t)
@@ -130,7 +170,29 @@ LJLIB_LUA(table_remove) /*
     end
   end
 */
+#endif
 
+#if LJ_ZERO_BASED
+LJLIB_LUA(table_move) /*
+  function(a1, f, e, t, a2)
+    CHECK_tab(a1)
+    CHECK_int(f)
+    CHECK_int(e)
+    CHECK_int(t)
+    if a2 == nil then a2 = a1 end
+    CHECK_tab(a2)
+    if f < e then
+      local d = t - f
+      if t >= e or t <= f or a2 ~= a1 then
+	for i=f,e do a2[i+d] = a1[i] end
+      else
+	for i=e-1,f-1,-1 do a2[i+d] = a1[i] end
+      end
+    end
+    return a2
+  end
+*/
+#else
 LJLIB_LUA(table_move) /*
   function(a1, f, e, t, a2)
     CHECK_tab(a1)
@@ -150,6 +212,7 @@ LJLIB_LUA(table_move) /*
     return a2
   end
 */
+#endif
 
 LJLIB_CF(table_concat)		LJLIB_REC(.)
 {
