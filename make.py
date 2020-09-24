@@ -8,8 +8,11 @@ import sys
 build = sys.argv[ 1 ]
 output = sys.argv[ 2 ]
 
+# Export variables for macOS build.
+os.environ[ 'MACOSX_DEPLOYMENT_TARGET' ] = '10.9'
+
 # Make libluajit.
-subprocess.check_call( [ 'make', '-C', build ], env={ 'MACOSX_DEPLOYMENT_TARGET' : '10.9' } )
+subprocess.check_call( [ 'make', '-C', build ] )
 input = os.path.join( build, 'src', 'libluajit.so' )
 
 # Check if the build product is newer than our output file.
