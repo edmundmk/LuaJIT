@@ -101,6 +101,10 @@ XCFLAGS=
 # Note: this does not provide full compatibility with Lua 5.2 at this time.
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
 #
+# Disable automatic coercion of strings to numbers in arithmetic operators and
+# in the numeric for loop. Also disables similar coercions in the C API.
+XCFLAGS+= -DLUAJIT_DISABLE_COERCION
+#
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #

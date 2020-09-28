@@ -1107,7 +1107,13 @@ static void LJ_FASTCALL recff_io_write(jit_State *J, RecordFFData *rd)
   TRef one = lj_ir_kint(J, 1);
   ptrdiff_t i = rd->data == 0 ? 1 : 0;
   for (; J->base[i]; i++) {
-    TRef str = lj_ir_tostr(J, J->base[i]);
+    TRef str = J->base[i];
+    if (!tref_isstr(str)) {
+      if (tref_isnumber(str))
+	str = emitir(IRT(IR_TOSTR, IRT_STR), str, tref_isnum(str) ? IRTOSTR_NUM : IRTOSTR_INT);
+      else
+	lj_trace_err(J, LJ_TRERR_BADTYPE);
+    }
     TRef buf = emitir(IRT(IR_STRREF, IRT_PGC), str, zero);
     TRef len = emitir(IRTI(IR_FLOAD), str, IRFL_STR_LEN);
     if (tref_isk(len) && IR(tref_ref(len))->i == 1) {
