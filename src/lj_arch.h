@@ -639,7 +639,7 @@ extern void *LJ_WIN_LOADLIBA(const char *path);
 #define LJ_52			0
 #endif
 
-/* Disable coercion of strings to numbers. */
+/* Disable automatic coercion between strings and numbers. */
 #ifdef LUAJIT_DISABLE_COERCION
 #define LJ_NO_COERCION		1
 #else
