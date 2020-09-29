@@ -346,11 +346,15 @@ LUA_API int lua_lessthan(lua_State *L, int idx1, int idx2)
 LUA_API lua_Number lua_tonumber(lua_State *L, int idx)
 {
   cTValue *o = index2adr(L, idx);
+#if !LJ_NO_COERCION
   TValue tmp;
+#endif
   if (LJ_LIKELY(tvisnumber(o)))
     return numberVnum(o);
+#if !LJ_NO_COERCION
   else if (tvisstr(o) && lj_strscan_num(strV(o), &tmp))
     return numV(&tmp);
+#endif
   else
     return 0;
 }
@@ -358,13 +362,17 @@ LUA_API lua_Number lua_tonumber(lua_State *L, int idx)
 LUA_API lua_Number lua_tonumberx(lua_State *L, int idx, int *ok)
 {
   cTValue *o = index2adr(L, idx);
+#if !LJ_NO_COERCION
   TValue tmp;
+#endif
   if (LJ_LIKELY(tvisnumber(o))) {
     if (ok) *ok = 1;
     return numberVnum(o);
+#if !LJ_NO_COERCION
   } else if (tvisstr(o) && lj_strscan_num(strV(o), &tmp)) {
     if (ok) *ok = 1;
     return numV(&tmp);
+#endif
   } else {
     if (ok) *ok = 0;
     return 0;
@@ -377,7 +385,7 @@ LUALIB_API lua_Number luaL_checknumber(lua_State *L, int idx)
   TValue tmp;
   if (LJ_LIKELY(tvisnumber(o)))
     return numberVnum(o);
-  else if (!(tvisstr(o) && lj_strscan_num(strV(o), &tmp)))
+  else if (LJ_NO_COERCION || !(tvisstr(o) && lj_strscan_num(strV(o), &tmp)))
     lj_err_argt(L, idx, LUA_TNUMBER);
   return numV(&tmp);
 }
@@ -390,7 +398,7 @@ LUALIB_API lua_Number luaL_optnumber(lua_State *L, int idx, lua_Number def)
     return numberVnum(o);
   else if (tvisnil(o))
     return def;
-  else if (!(tvisstr(o) && lj_strscan_num(strV(o), &tmp)))
+  else if (LJ_NO_COERCION || !(tvisstr(o) && lj_strscan_num(strV(o), &tmp)))
     lj_err_argt(L, idx, LUA_TNUMBER);
   return numV(&tmp);
 }
@@ -405,7 +413,7 @@ LUA_API lua_Integer lua_tointeger(lua_State *L, int idx)
   } else if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else {
-    if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
+    if (LJ_NO_COERCION || !(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       return 0;
     if (tvisint(&tmp))
       return intV(&tmp);
@@ -429,7 +437,7 @@ LUA_API lua_Integer lua_tointegerx(lua_State *L, int idx, int *ok)
   } else if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else {
-    if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp))) {
+    if (LJ_NO_COERCION || !(tvisstr(o) && lj_strscan_number(strV(o), &tmp))) {
       if (ok) *ok = 0;
       return 0;
     }
@@ -457,7 +465,7 @@ LUALIB_API lua_Integer luaL_checkinteger(lua_State *L, int idx)
   } else if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else {
-    if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
+    if (LJ_NO_COERCION || !(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       lj_err_argt(L, idx, LUA_TNUMBER);
     if (tvisint(&tmp))
       return (lua_Integer)intV(&tmp);
@@ -482,7 +490,7 @@ LUALIB_API lua_Integer luaL_optinteger(lua_State *L, int idx, lua_Integer def)
   } else if (tvisnil(o)) {
     return def;
   } else {
-    if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
+    if (LJ_NO_COERCION || !(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       lj_err_argt(L, idx, LUA_TNUMBER);
     if (tvisint(&tmp))
       return (lua_Integer)intV(&tmp);
@@ -507,11 +515,13 @@ LUA_API const char *lua_tolstring(lua_State *L, int idx, size_t *len)
   GCstr *s;
   if (LJ_LIKELY(tvisstr(o))) {
     s = strV(o);
+#if !LJ_NO_COERCION
   } else if (tvisnumber(o)) {
     lj_gc_check(L);
     o = index2adr(L, idx);  /* GC may move the stack. */
     s = lj_strfmt_number(L, o);
     setstrV(L, o, s);
+#endif
   } else {
     if (len != NULL) *len = 0;
     return NULL;
@@ -526,11 +536,13 @@ LUALIB_API const char *luaL_checklstring(lua_State *L, int idx, size_t *len)
   GCstr *s;
   if (LJ_LIKELY(tvisstr(o))) {
     s = strV(o);
+#if !LJ_NO_COERCION
   } else if (tvisnumber(o)) {
     lj_gc_check(L);
     o = index2adr(L, idx);  /* GC may move the stack. */
     s = lj_strfmt_number(L, o);
     setstrV(L, o, s);
+#endif
   } else {
     lj_err_argt(L, idx, LUA_TSTRING);
   }
@@ -548,11 +560,13 @@ LUALIB_API const char *luaL_optlstring(lua_State *L, int idx,
   } else if (tvisnil(o)) {
     if (len != NULL) *len = def ? strlen(def) : 0;
     return def;
+#if !LJ_NO_COERCION
   } else if (tvisnumber(o)) {
     lj_gc_check(L);
     o = index2adr(L, idx);  /* GC may move the stack. */
     s = lj_strfmt_number(L, o);
     setstrV(L, o, s);
+#endif
   } else {
     lj_err_argt(L, idx, LUA_TSTRING);
   }
@@ -582,10 +596,12 @@ LUA_API size_t lua_objlen(lua_State *L, int idx)
     return (size_t)lj_tab_len(tabV(o));
   } else if (tvisudata(o)) {
     return udataV(o)->len;
+#if !LJ_NO_COERCION
   } else if (tvisnumber(o)) {
     GCstr *s = lj_strfmt_number(L, o);
     setstrV(L, o, s);
     return s->len;
+#endif
   } else {
     return 0;
   }

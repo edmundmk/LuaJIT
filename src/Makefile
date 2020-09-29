@@ -105,6 +105,10 @@ XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
 # loop, ipairs(), and several other standard library functions.
 XCFLAGS+= -DLUAJIT_ZERO_BASED_INDEXING
 #
+# Disable automatic coercion of strings to numbers in arithmetic operators and
+# in the numeric for loop. Also disables similar coercions in the C API.
+XCFLAGS+= -DLUAJIT_DISABLE_COERCION
+#
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #

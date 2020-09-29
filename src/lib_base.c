@@ -277,7 +277,7 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
   int32_t base = lj_lib_optint(L, 2, 10);
   if (base == 10) {
     TValue *o = lj_lib_checkany(L, 1);
-    if (lj_strscan_numberobj(o)) {
+    if (tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o))) {
       copyTV(L, L->base-1-LJ_FR2, o);
       return FFH_RES(1);
     }

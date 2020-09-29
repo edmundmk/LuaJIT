@@ -44,6 +44,13 @@
 /* Emit raw IR without passing through optimizations. */
 #define emitir_raw(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_ir_emit(J))
 
+/* Check if an operand is a number, or can be coerced. */
+#if LJ_NO_COERCION
+#define tref_isnumber_coerce(tr) (tref_isnumber(tr))
+#else
+#define tref_isnumber_coerce(tr) (tref_isnumber_str(tr))
+#endif
+
 /* -- Sanity checks ------------------------------------------------------- */
 
 #ifdef LUA_USE_ASSERT
@@ -532,9 +539,11 @@ static LoopEvent rec_for(jit_State *J, const BCIns *fori, int isforl)
 						   IRT_NUM;
     for (i = FORL_IDX; i <= FORL_STEP; i++) {
       if (!tr[i]) sload(J, ra+i);
-      lj_assertJ(tref_isnumber_str(tr[i]), "bad FORI argument type");
+      lj_assertJ(tref_isnumber_coerce(tr[i]), "bad FORI argument type");
+#if !LJ_NO_COERCION
       if (tref_isstr(tr[i]))
 	tr[i] = emitir(IRTG(IR_STRTO, IRT_NUM), tr[i], 0);
+#endif
       if (t == IRT_INT) {
 	if (!tref_isinteger(tr[i]))
 	  tr[i] = emitir(IRTGI(IR_CONV), tr[i], IRCONV_INT_NUM|IRCONV_CHECK);
@@ -2260,7 +2269,7 @@ void lj_record_ins(jit_State *J)
   /* -- Arithmetic ops ---------------------------------------------------- */
 
   case BC_UNM:
-    if (tref_isnumber_str(rc)) {
+    if (tref_isnumber_coerce(rc)) {
       rc = lj_opt_narrow_unm(J, rc, rcv);
     } else {
       ix.tab = rc;
@@ -2281,7 +2290,7 @@ void lj_record_ins(jit_State *J)
   case BC_ADDVN: case BC_SUBVN: case BC_MULVN: case BC_DIVVN:
   case BC_ADDVV: case BC_SUBVV: case BC_MULVV: case BC_DIVVV: {
     MMS mm = bcmode_mm(op);
-    if (tref_isnumber_str(rb) && tref_isnumber_str(rc))
+    if (tref_isnumber_coerce(rb) && tref_isnumber_coerce(rc))
       rc = lj_opt_narrow_arith(J, rb, rc, rbv, rcv,
 			       (int)mm - (int)MM_add + (int)IR_ADD);
     else
@@ -2291,14 +2300,14 @@ void lj_record_ins(jit_State *J)
 
   case BC_MODVN: case BC_MODVV:
   recmod:
-    if (tref_isnumber_str(rb) && tref_isnumber_str(rc))
+    if (tref_isnumber_coerce(rb) && tref_isnumber_coerce(rc))
       rc = lj_opt_narrow_mod(J, rb, rc, rbv, rcv);
     else
       rc = rec_mm_arith(J, &ix, MM_mod);
     break;
 
   case BC_POW:
-    if (tref_isnumber_str(rb) && tref_isnumber_str(rc))
+    if (tref_isnumber_coerce(rb) && tref_isnumber_coerce(rc))
       rc = lj_opt_narrow_pow(J, rb, rc, rbv, rcv);
     else
       rc = rec_mm_arith(J, &ix, MM_pow);

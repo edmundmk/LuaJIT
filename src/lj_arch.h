@@ -646,6 +646,13 @@ extern void *LJ_WIN_LOADLIBA(const char *path);
 #define LJ_ZERO_BASED		0
 #endif
 
+/* Disable automatic coercion between strings and numbers. */
+#ifdef LUAJIT_DISABLE_COERCION
+#define LJ_NO_COERCION		1
+#else
+#define LJ_NO_COERCION		0
+#endif
+
 /* -- VM security --------------------------------------------------------- */
 
 /* Don't make any changes here. Instead build with:

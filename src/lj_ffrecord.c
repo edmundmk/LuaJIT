@@ -66,8 +66,13 @@ typedef void (LJ_FASTCALL *RecordFunc)(jit_State *J, RecordFFData *rd);
 /* Get runtime value of int argument. */
 static int32_t argv2int(jit_State *J, TValue *o)
 {
+#if LJ_NO_COERCION
+  if (!tvisnumber(o))
+    lj_trace_err(J, LJ_TRERR_BADTYPE);
+#else
   if (!lj_strscan_numberobj(o))
     lj_trace_err(J, LJ_TRERR_BADTYPE);
+#endif
   return tvisint(o) ? intV(o) : lj_num2int(numV(o));
 }
 
@@ -77,12 +82,16 @@ static GCstr *argv2str(jit_State *J, TValue *o)
   if (LJ_LIKELY(tvisstr(o))) {
     return strV(o);
   } else {
+#if LJ_NO_COERCION
+    lj_trace_err(J, LJ_TRERR_BADTYPE);
+#else
     GCstr *s;
     if (!tvisnumber(o))
       lj_trace_err(J, LJ_TRERR_BADTYPE);
     s = lj_strfmt_number(J->L, o);
     setstrV(J->L, o, s);
     return s;
+#endif
   }
 }
 
@@ -1134,7 +1143,13 @@ static void LJ_FASTCALL recff_io_write(jit_State *J, RecordFFData *rd)
   TRef one = lj_ir_kint(J, 1);
   ptrdiff_t i = rd->data == 0 ? 1 : 0;
   for (; J->base[i]; i++) {
-    TRef str = lj_ir_tostr(J, J->base[i]);
+    TRef str = J->base[i];
+    if (!tref_isstr(str)) {
+      if (tref_isnumber(str))
+	str = emitir(IRT(IR_TOSTR, IRT_STR), str, tref_isnum(str) ? IRTOSTR_NUM : IRTOSTR_INT);
+      else
+	lj_trace_err(J, LJ_TRERR_BADTYPE);
+    }
     TRef buf = emitir(IRT(IR_STRREF, IRT_PGC), str, zero);
     TRef len = emitir(IRTI(IR_FLOAD), str, IRFL_STR_LEN);
     if (tref_isk(len) && IR(tref_ref(len))->i == 1) {
