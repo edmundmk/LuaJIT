@@ -203,8 +203,10 @@ static cTValue *str2num(cTValue *o, TValue *n)
     return o;
   else if (tvisint(o))
     return (setnumV(n, (lua_Number)intV(o)), n);
+#if !LJ_NO_COERCION
   else if (tvisstr(o) && lj_strscan_num(strV(o), n))
     return n;
+#endif
   else
     return NULL;
 }
@@ -448,9 +450,15 @@ void lj_meta_call(lua_State *L, TValue *func, TValue *top)
 /* Helper for FORI. Coercion. */
 void LJ_FASTCALL lj_meta_for(lua_State *L, TValue *o)
 {
+#if LJ_NO_COERCION
+  if (!tvisnumber(o)) lj_err_msg(L, LJ_ERR_FORINIT);
+  if (!tvisnumber(o+1)) lj_err_msg(L, LJ_ERR_FORLIM);
+  if (!tvisnumber(o+2)) lj_err_msg(L, LJ_ERR_FORSTEP);
+#else
   if (!lj_strscan_numberobj(o)) lj_err_msg(L, LJ_ERR_FORINIT);
   if (!lj_strscan_numberobj(o+1)) lj_err_msg(L, LJ_ERR_FORLIM);
   if (!lj_strscan_numberobj(o+2)) lj_err_msg(L, LJ_ERR_FORSTEP);
+#endif
   if (LJ_DUALNUM) {
     /* Ensure all slots are integers or all slots are numbers. */
     int32_t k[3];

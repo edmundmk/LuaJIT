@@ -215,17 +215,27 @@ GCstr *lj_lib_optstr(lua_State *L, int narg)
 void lj_lib_checknumber(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
+#if LJ_NO_COERCION
+  if (!(o < L->top && tvisnumber(o)))
+    lj_err_argt(L, narg, LUA_TNUMBER);
+#else
   if (!(o < L->top && lj_strscan_numberobj(o)))
     lj_err_argt(L, narg, LUA_TNUMBER);
+#endif
 }
 #endif
 
 lua_Number lj_lib_checknum(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
+#if LJ_NO_COERCION
+  if (!(o < L->top && tvisnumber(o)))
+    lj_err_argt(L, narg, LUA_TNUMBER);
+#else
   if (!(o < L->top &&
 	(tvisnumber(o) || (tvisstr(o) && lj_strscan_num(strV(o), o)))))
     lj_err_argt(L, narg, LUA_TNUMBER);
+#endif
   if (LJ_UNLIKELY(tvisint(o))) {
     lua_Number n = (lua_Number)intV(o);
     setnumV(o, n);
@@ -238,8 +248,13 @@ lua_Number lj_lib_checknum(lua_State *L, int narg)
 int32_t lj_lib_checkint(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
+#if LJ_NO_COERCION
+  if (!(o < L->top && tvisnumber(o)))
+    lj_err_argt(L, narg, LUA_TNUMBER);
+#else
   if (!(o < L->top && lj_strscan_numberobj(o)))
     lj_err_argt(L, narg, LUA_TNUMBER);
+#endif
   if (LJ_LIKELY(tvisint(o))) {
     return intV(o);
   } else {

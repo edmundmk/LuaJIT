@@ -31,10 +31,12 @@ LJ_FUNC int LJ_FASTCALL lj_strscan_number(GCstr *str, TValue *o);
 #define lj_strscan_number(s, o)		lj_strscan_num((s), (o))
 #endif
 
+#if !LJ_NO_COERCION
 /* Check for number or convert string to number/int in-place (!). */
 static LJ_AINLINE int lj_strscan_numberobj(TValue *o)
 {
   return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o));
 }
+#endif
 
 #endif
