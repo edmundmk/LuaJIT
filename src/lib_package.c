@@ -444,7 +444,7 @@ static int lj_cf_package_require(lua_State *L)
   if (!lua_istable(L, -1))
     luaL_error(L, LUA_QL("package.loaders") " must be a table");
   lua_pushliteral(L, "");  /* error message accumulator */
-  for (i = 1; ; i++) {
+  for (i = LJ_ZERO_BASED ? 0 : 1; ; i++) {
     lua_rawgeti(L, -2, i);  /* get a loader */
     if (lua_isnil(L, -1))
       luaL_error(L, "module " LUA_QS " not found:%s",
@@ -602,7 +602,7 @@ LUALIB_API int luaopen_package(lua_State *L)
   lua_createtable(L, sizeof(package_loaders)/sizeof(package_loaders[0])-1, 0);
   for (i = 0; package_loaders[i] != NULL; i++) {
     lj_lib_pushcf(L, package_loaders[i], 1);
-    lua_rawseti(L, -2, i+1);
+    lua_rawseti(L, -2, (LJ_ZERO_BASED ? 0 : 1) + i);
   }
 #if LJ_52
   lua_pushvalue(L, -1);
