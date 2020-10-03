@@ -290,7 +290,11 @@ LUALIB_API int luaL_ref(lua_State *L, int t)
   } else {  /* no free elements */
     ref = (int)lua_objlen(L, t);
 #if LJ_ZERO_BASED
-    if (ref == 0) ref++; /* first empty slot other than zero. */
+    if (LJ_UNLIKELY(ref == FREELIST_REF)) {
+      lua_pushinteger(L, 0);
+      lua_rawseti(L, t, FREELIST_REF);
+      ref = (int)lua_objlen(L, t);
+    }
 #else
     ref++;  /* create new reference */
 #endif
