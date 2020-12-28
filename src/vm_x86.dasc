@@ -2384,8 +2384,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  test RA, RA			// start < 0?
   |  jl >7
   |2:
-  |  sub RC, RA 			// end = end-start; end < 0?
-  |  jl ->fff_emptystr
+  |  sub RC, RA 			// end = end-start; end <= 0?
+  |  jle ->fff_emptystr
   |3:
   |  lea RB, [STR:RB+RA+#STR]
   |4:

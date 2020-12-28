@@ -1976,8 +1976,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  test RCd, RCd			// start < 0?
   |  jl >7
   |2:
-  |  sub TMPRd, RCd 			// end = end-start; end < 0?
-  |  jl ->fff_emptystr
+  |  sub TMPRd, RCd 			// end = end-start; end <= 0?
+  |  jle ->fff_emptystr
   |3:
   |  lea RD, [STR:RB+RCd+#STR]
   |4:

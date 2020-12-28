@@ -1156,7 +1156,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  cbnz TAB:CARG2, ->fff_fallback
 #endif
   |  mov RC, #(3+1)*8
+#if LJ_ZERO_BASED
+  |  orr TMP0, TISNUM, #U64x(00000000,ffffffff)
+  |  stp CARG1, TMP0, [BASE, #-8]
+#else
   |  stp CARG1, TISNUM, [BASE, #-8]
+#endif
   |   str CFUNC:CARG4, [BASE, #-16]
   |  b ->fff_res
   |
@@ -1536,6 +1541,46 @@ static void build_subroutines(BuildCtx *ctx)
   |  add CARG1, CARG1, TMP1, lsl #47
   |  b ->fff_restv
   |
+#if LJ_ZERO_BASED
+  |.ffunc string_sub
+  |  ffgccheck
+  |  cmp NARGS8:RC, #16
+  |  blo ->fff_fallback
+  |   ldr CARG1, [BASE]			// 1st argument is s
+  |    ldr CARG3, [BASE, #16]		// 3rd argument is end
+  |   checkstr CARG1, ->fff_fallback
+  |   ldr TMP1w, STR:CARG1->len
+  |   mov RB, TMP1			// By default, end = len
+  |  cmp NARGS8:RC, #16
+  |  beq >1
+  |    checkint CARG3, ->fff_fallback
+  |    sxtw RB, CARG3w
+  |1:
+  |  ldr CARG2, [BASE, #8]		// 2nd argument is start
+  |  checkint CARG2, ->fff_fallback
+  |  sxtw CARG2, CARG2w
+  |  // CARG1 = str, TMP1 = str->len, CARG2 = start, RB = end
+  |   add TMP2, RB, TMP1
+  |   cmp RB, #0
+  |  add TMP0, CARG2, TMP1
+  |   csel RB, RB, TMP2, ge		// if (end < 0) end += len;
+  |  cmp CARG2, #0
+  |  csel CARG2, CARG2, TMP0, ge	// if (start < 0) start += len;
+  |   cmp RB, #0
+  |   csel RB, RB, xzr, ge 		// if (end < 0) end = 0
+  |  cmp CARG2, #0
+  |  csel CARG2, CARG2, xzr, ge 	// if (start < 0) start = 0
+  |   cmp RB, TMP1
+  |   csel RB, RB, TMP1, le 		// if (end > len) end = len
+  |  add CARG1, STR:CARG1, #sizeof(GCstr)
+  |   subs CARG3, RB, CARG2 		// len = end - start
+  |  add CARG2, CARG1, CARG2
+  |   bgt ->fff_newstr
+  |  add STR:CARG1, GL, #offsetof(global_State, strempty)
+  |   movn TMP1, #~LJ_TSTR
+  |  add CARG1, CARG1, TMP1, lsl #47
+  |  b ->fff_restv
+#else
   |.ffunc string_sub
   |  ffgccheck
   |  ldr CARG1, [BASE]
@@ -1574,6 +1619,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   movn TMP1, #~LJ_TSTR
   |  add CARG1, CARG1, TMP1, lsl #47
   |  b ->fff_restv
+#endif
   |
   |.macro ffstring_op, name
   |  .ffunc string_ .. name
@@ -3638,6 +3684,18 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  str d0, FOR_IDX
       |  str d0, FOR_EXT
     }
+#if LJ_ZERO_BASED
+    if (op == BC_FORI) {
+      |  csel PC, RC, PC, hs
+    } else if (op == BC_JFORI) {
+      |  ldrh RCw, [RC, #-4+OFS_RD]
+      |  blo =>BC_JLOOP
+    } else if (op == BC_IFORL) {
+      |  csel PC, RC, PC, lo
+    } else {
+      |  blo =>BC_JLOOP
+    }
+#else
     if (op == BC_FORI) {
       |  csel PC, RC, PC, hi
     } else if (op == BC_JFORI) {
@@ -3648,6 +3706,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     } else {
       |  bls =>BC_JLOOP
     }
+#endif
     |  b <2
     |
     |7:  // Invert check for negative step.
