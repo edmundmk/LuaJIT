@@ -94,7 +94,7 @@
 |.define SAVE_CFRAME,	[sp]
 |//----- 16 byte aligned, <-- sp while in interpreter.
 |
-|.define TMPDofs,	#184
+|.define TMPDofs,	#24
 |
 |.macro save_, gpr1, gpr2, fpr1, fpr2
 |  stp d..fpr1, d..fpr2, [sp, # SAVE_FPR_+(15-fpr1)*8]
