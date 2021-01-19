@@ -81,47 +81,48 @@
 |
 |.define CFRAME_SPACE,	208
 |//----- 16 byte aligned, <-- sp entering interpreter
-|// Unused		[sp, #204]	// 32 bit values
-|.define SAVE_NRES,	[sp, #200]
-|.define SAVE_ERRF,	[sp, #196]
-|.define SAVE_MULTRES,	[sp, #192]
-|.define TMPD,		[sp, #184]	// 64 bit values
-|.define SAVE_L,	[sp, #176]
-|.define SAVE_PC,	[sp, #168]
-|.define SAVE_CFRAME,	[sp, #160]
-|.define SAVE_FPR_,	96		// 96+8*8: 64 bit FPR saves
-|.define SAVE_GPR_,	16		// 16+10*8: 64 bit GPR saves
-|.define SAVE_LR,	[sp, #8]
-|.define SAVE_FP,	[sp]
+|.define SAVE_FP_LR_,	192		// 192+2*8: fp, lr
+|.define SAVE_GPR_,	112 		// 112+10*8: 64 bit GPR saves
+|.define SAVE_FPR_,	48		// 48+8*8: 64 bit FPR saves
+|// Unused		[sp, #44]	// 32 bit values
+|.define SAVE_NRES,	[sp, #40]
+|.define SAVE_ERRF,	[sp, #36]
+|.define SAVE_MULTRES,	[sp, #32]
+|.define TMPD,		[sp, #24]	// 64 bit values
+|.define SAVE_L,	[sp, #16]
+|.define SAVE_PC,	[sp, #8]
+|.define SAVE_CFRAME,	[sp]
 |//----- 16 byte aligned, <-- sp while in interpreter.
 |
 |.define TMPDofs,	#184
 |
 |.macro save_, gpr1, gpr2, fpr1, fpr2
-|  stp d..fpr1, d..fpr2, [sp, # SAVE_FPR_+(fpr1-8)*8]
-|  stp x..gpr1, x..gpr2, [sp, # SAVE_GPR_+(gpr1-19)*8]
+|  stp d..fpr1, d..fpr2, [sp, # SAVE_FPR_+(15-fpr1)*8]
+|  stp x..gpr1, x..gpr2, [sp, # SAVE_GPR_+(28-gpr1)*8]
 |.endmacro
 |.macro rest_, gpr1, gpr2, fpr1, fpr2
-|  ldp d..fpr1, d..fpr2, [sp, # SAVE_FPR_+(fpr1-8)*8]
-|  ldp x..gpr1, x..gpr2, [sp, # SAVE_GPR_+(gpr1-19)*8]
+|  ldp d..fpr1, d..fpr2, [sp, # SAVE_FPR_+(15-fpr1)*8]
+|  ldp x..gpr1, x..gpr2, [sp, # SAVE_GPR_+(28-gpr1)*8]
 |.endmacro
 |
 |.macro saveregs
-|  stp fp, lr, [sp, #-CFRAME_SPACE]!
-|  add fp, sp, #0
-|  stp x19, x20, [sp, # SAVE_GPR_]
-|  save_ 21, 22, 8, 9
-|  save_ 23, 24, 10, 11
-|  save_ 25, 26, 12, 13
-|  save_ 27, 28, 14, 15
+|  sub sp, sp, # CFRAME_SPACE
+|  save_ 28, 27, 15, 14
+|  save_ 26, 25, 13, 12
+|  save_ 24, 23, 11, 10
+|  save_ 22, 21, 9, 8
+|  stp x20, x19, [sp, # SAVE_GPR_+8*8]
+|  stp fp, lr, [sp, # SAVE_FP_LR_]
+|  add fp, sp, # SAVE_FP_LR_
 |.endmacro
 |.macro restoreregs
-|  ldp x19, x20, [sp, # SAVE_GPR_]
-|  rest_ 21, 22, 8, 9
-|  rest_ 23, 24, 10, 11
-|  rest_ 25, 26, 12, 13
-|  rest_ 27, 28, 14, 15
-|  ldp fp, lr, [sp], # CFRAME_SPACE
+|  ldp fp, lr, [sp, # SAVE_FP_LR_]
+|  ldp x20, x19, [sp, # SAVE_GPR_+8*8]
+|  rest_ 22, 21, 9, 8
+|  rest_ 24, 23, 11, 10
+|  rest_ 26, 25, 13, 12
+|  rest_ 28, 27, 15, 14
+|  add sp, sp, # CFRAME_SPACE
 |.endmacro
 |
 |// Type definitions. Some of these are only used for documentation.
@@ -500,8 +501,9 @@ static void build_subroutines(BuildCtx *ctx)
   |    ldr GL, L->glref			// Setup pointer to global state.
   |     mov BASE, CARG2
   |   str CARG1, SAVE_PC		// Any value outside of bytecode is ok.
-  |  str RC, SAVE_CFRAME
-  |  str fp, L->cframe			// Add our C frame to cframe chain.
+  |  add TMP0, sp, #0
+  |   str RC, SAVE_CFRAME
+  |  str TMP0, L->cframe			// Add our C frame to cframe chain.
   |
   |3:  // Entry point for vm_cpcall/vm_resume (BASE = base, PC = ftype).
   |  str L, GL->cur_L
@@ -536,8 +538,9 @@ static void build_subroutines(BuildCtx *ctx)
   |   sub RA, RA, RB			// Compute -savestack(L, L->top).
   |   str RAw, SAVE_NRES		// Neg. delta means cframe w/o frame.
   |  str wzr, SAVE_ERRF			// No error function.
-  |  str RC, SAVE_CFRAME
-  |  str fp, L->cframe			// Add our C frame to cframe chain.
+  |  add TMP0, sp, #0
+  |   str RC, SAVE_CFRAME
+  |  str TMP0, L->cframe		// Add our C frame to cframe chain.
   |    str L, GL->cur_L
   |  blr CARG4			// (lua_State *L, lua_CFunction func, void *ud)
   |  mov BASE, CRET1
@@ -2122,16 +2125,16 @@ static void build_subroutines(BuildCtx *ctx)
   |  // Caveat: needs special frame unwinding, see below.
   |.if FFI
   |  .type CCSTATE, CCallState, x19
-  |  stp fp, lr, [sp, #-32]!
-  |  add fp, sp, #0
-  |  str CCSTATE, [sp, #16]
+  |  stp x20, CCSTATE, [sp, #-32]!
+  |  stp fp, lr, [sp, #16]
+  |  add fp, sp, #16
   |  mov CCSTATE, x0
   |  ldr TMP0w, CCSTATE:x0->spadj
   |   ldrb TMP1w, CCSTATE->nsp
   |    add TMP2, CCSTATE, #offsetof(CCallState, stack)
   |   subs TMP1, TMP1, #1
   |    ldr TMP3, CCSTATE->func
-  |  sub sp, fp, TMP0
+  |  sub sp, sp, TMP0
   |   bmi >2
   |1:  // Copy stack slots
   |  ldr TMP0, [TMP2, TMP1, lsl #3]
@@ -2149,12 +2152,12 @@ static void build_subroutines(BuildCtx *ctx)
   |   ldp d6, d7, CCSTATE->fpr[6]
   |  ldr x8, CCSTATE->retp
   |  blr TMP3
-  |  mov sp, fp
+  |  sub sp, fp, #16
   |  stp x0, x1, CCSTATE->gpr[0]
   |   stp d0, d1, CCSTATE->fpr[0]
   |   stp d2, d3, CCSTATE->fpr[2]
-  |  ldr CCSTATE, [sp, #16]
-  |  ldp fp, lr, [sp], #32
+  |  ldp fp, lr, [sp, #16]
+  |  ldp x20, CCSTATE, [sp], #32
   |  ret
   |.endif
   |// Note: vm_ffi_call must be the last function in this object file!
@@ -3860,7 +3863,7 @@ static int build_backend(BuildCtx *ctx)
 static void emit_asm_debug(BuildCtx *ctx)
 {
   int fcofs = (int)((uint8_t *)ctx->glob[GLOB_vm_ffi_call] - ctx->code);
-  int i, cf = CFRAME_SIZE >> 3;
+  int r, cf = CFRAME_SIZE >> 3;
   switch (ctx->mode) {
   case BUILD_elfasm:
     fprintf(ctx->fp, "\t.section .debug_frame,\"\",%%progbits\n");
@@ -3874,7 +3877,7 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.uleb128 0x1\n"
 	"\t.sleb128 -8\n"
 	"\t.byte 30\n"				/* Return address is in lr. */
-	"\t.byte 0xc\n\t.uleb128 31\n\t.uleb128 0\n"	/* def_cfa sp */
+	"\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 16\n"	/* def_cfa fp 16 */
 	"\t.align 3\n"
 	".LECIE0:\n\n");
     fprintf(ctx->fp,
@@ -3884,15 +3887,13 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.long .Lframe0\n"
 	"\t.quad .Lbegin\n"
 	"\t.quad %d\n"
-	"\t.byte 0xe\n\t.uleb128 %d\n"		/* def_cfa_offset */
-	"\t.byte 0x9d\n\t.uleb128 %d\n"		/* offset fp */
-	"\t.byte 0x9e\n\t.uleb128 %d\n",	/* offset lr */
-	fcofs, CFRAME_SIZE, cf, cf-1);
-    for (i = 19; i <= 28; i++)  /* offset x19-x28 */
-      fprintf(ctx->fp, "\t.byte 0x%x\n\t.uleb128 %d\n", 0x80+i, cf-i+17);
-    for (i = 8; i <= 15; i++)  /* offset d8-d15 */
-      fprintf(ctx->fp, "\t.byte 5\n\t.uleb128 0x%x\n\t.uleb128 %d\n",
-	      64+i, cf-i-4);
+	"\t.byte 0x9e\n\t.uleb128 1\n"		/* offset lr */
+	"\t.byte 0x9d\n\t.uleb128 2\n",		/* offset fp */
+	fcofs);
+    for (r = 19; r <= 28; r++)  /* offset x19-x28 */
+      fprintf(ctx->fp, "\t.byte 0x%x\n\t.uleb128 %d\n", 0x80+r, r-16);
+    for (r = 8; r <= 15; r++)  /* offset d8-d15 */
+      fprintf(ctx->fp, "\t.byte 5\n\t.uleb128 0x%x\n\t.uleb128 %d\n", 64+r, r+5);
     fprintf(ctx->fp,
 	"\t.align 3\n"
 	".LEFDE0:\n\n");
@@ -3904,10 +3905,10 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.long .Lframe0\n"
 	"\t.quad lj_vm_ffi_call\n"
 	"\t.quad %d\n"
-	"\t.byte 0xe\n\t.uleb128 32\n"		/* def_cfa_offset */
-	"\t.byte 0x9d\n\t.uleb128 4\n"		/* offset fp */
-	"\t.byte 0x9e\n\t.uleb128 3\n"		/* offset lr */
-	"\t.byte 0x93\n\t.uleb128 2\n"		/* offset x19 */
+	"\t.byte 0x9e\n\t.uleb128 1\n"		/* offset lr */
+	"\t.byte 0x9d\n\t.uleb128 2\n"		/* offset fp */
+	"\t.byte 0x93\n\t.uleb128 3\n"		/* offset x19 */
+	"\t.byte 0x94\n\t.uleb128 4\n"		/* offset x20 */
 	"\t.align 3\n"
 	".LEFDE1:\n\n", (int)ctx->codesz - fcofs);
 #endif
@@ -3926,7 +3927,7 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
 	"\t.long lj_err_unwind_dwarf-.\n"
 	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	"\t.byte 0xc\n\t.uleb128 31\n\t.uleb128 0\n"	/* def_cfa sp */
+	"\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 16\n"	/* def_cfa fp 16 */
 	"\t.align 3\n"
 	".LECIE1:\n\n");
     fprintf(ctx->fp,
@@ -3937,15 +3938,13 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.long .Lbegin-.\n"
 	"\t.long %d\n"
 	"\t.uleb128 0\n"			/* augmentation length */
-	"\t.byte 0xe\n\t.uleb128 %d\n"		/* def_cfa_offset */
-	"\t.byte 0x9d\n\t.uleb128 %d\n"		/* offset fp */
-	"\t.byte 0x9e\n\t.uleb128 %d\n",	/* offset lr */
-	fcofs, CFRAME_SIZE, cf, cf-1);
-    for (i = 19; i <= 28; i++)  /* offset x19-x28 */
-      fprintf(ctx->fp, "\t.byte 0x%x\n\t.uleb128 %d\n", 0x80+i, cf-i+17);
-    for (i = 8; i <= 15; i++)  /* offset d8-d15 */
-      fprintf(ctx->fp, "\t.byte 5\n\t.uleb128 0x%x\n\t.uleb128 %d\n",
-	      64+i, cf-i-4);
+	"\t.byte 0x9e\n\t.uleb128 1\n"		/* offset lr */
+	"\t.byte 0x9d\n\t.uleb128 2\n",		/* offset fp */
+	fcofs);
+    for (r = 19; r <= 28; r++)  /* offset x19-x28 */
+      fprintf(ctx->fp, "\t.byte 0x%x\n\t.uleb128 %d\n", 0x80+r, r-16);
+    for (r = 8; r <= 15; r++)  /* offset d8-d15 */
+      fprintf(ctx->fp, "\t.byte 5\n\t.uleb128 0x%x\n\t.uleb128 %d\n", 64+r, r+5);
     fprintf(ctx->fp,
 	"\t.align 3\n"
 	".LEFDE2:\n\n");
@@ -3962,7 +3961,7 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.byte 30\n"				/* Return address is in lr. */
 	"\t.uleb128 1\n"			/* augmentation length */
 	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	"\t.byte 0xc\n\t.uleb128 31\n\t.uleb128 0\n"	/* def_cfa sp */
+	"\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 16\n"	/* def_cfa fp 16 */
 	"\t.align 3\n"
 	".LECIE2:\n\n");
     fprintf(ctx->fp,
@@ -3973,14 +3972,107 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.long lj_vm_ffi_call-.\n"
 	"\t.long %d\n"
 	"\t.uleb128 0\n"			/* augmentation length */
-	"\t.byte 0xe\n\t.uleb128 32\n"		/* def_cfa_offset */
-	"\t.byte 0x9d\n\t.uleb128 4\n"		/* offset fp */
-	"\t.byte 0x9e\n\t.uleb128 3\n"		/* offset lr */
-	"\t.byte 0x93\n\t.uleb128 2\n"		/* offset x19 */
+	"\t.byte 0x9e\n\t.uleb128 1\n"		/* offset lr */
+	"\t.byte 0x9d\n\t.uleb128 2\n"		/* offset fp */
+	"\t.byte 0x93\n\t.uleb128 3\n"		/* offset x19 */
+	"\t.byte 0x94\n\t.uleb128 4\n"		/* offset x20 */
 	"\t.align 3\n"
 	".LEFDE3:\n\n", (int)ctx->codesz - fcofs);
 #endif
     break;
+#if !LJ_NO_UNWIND
+  case BUILD_machasm: {
+#if LJ_HASFFI
+    int fcsize = 0;
+#endif
+    int i, r;
+    fprintf(ctx->fp, "\t.section __TEXT,__eh_frame,coalesced,no_toc+strip_static_syms+live_support\n");
+    fprintf(ctx->fp,
+	"EH_frame1:\n"
+	"\t.set L$set$x,LECIEX-LSCIEX\n"
+	"\t.long L$set$x\n"
+	"LSCIEX:\n"
+	"\t.long 0\n"
+	"\t.byte 0x1\n"
+	"\t.ascii \"zPR\\0\"\n"
+	"\t.uleb128 0x1\n"
+	"\t.sleb128 -8\n"
+	"\t.byte 30\n"				/* Return address is in lr. */
+	"\t.uleb128 6\n"			/* augmentation length */
+	"\t.byte 0x9b\n"			/* indirect|pcrel|sdata4 */
+	"\t.long _lj_err_unwind_dwarf@GOT-.\n"
+	"\t.byte 0x10\n"			/* pointer */
+	"\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 16\n"	/* def_cfa fp 16 */
+	"\t.align 3\n"
+	"LECIEX:\n\n");
+    for (i = 0; i < ctx->nsym; i++) {
+      const char *name = ctx->sym[i].name;
+      int32_t size = ctx->sym[i+1].ofs - ctx->sym[i].ofs;
+      if (size == 0) continue;
+#if LJ_HASFFI
+      if (!strcmp(name, "_lj_vm_ffi_call")) { fcsize = size; continue; }
+#endif
+      fprintf(ctx->fp,
+	  "LSFDE%d:\n"
+	  "\t.set L$set$%d,LEFDE%d-LASFDE%d\n"
+	  "\t.long L$set$%d\n"
+	  "LASFDE%d:\n"
+	  "\t.long LASFDE%d-EH_frame1\n"
+	  "\t.quad %s-.\n"
+	  "\t.quad %d\n"
+	  "\t.uleb128 0\n"			/* augmentation length */
+	  "\t.byte 0x9e\n\t.uleb128 1\n"	/* offset lr */
+	  "\t.byte 0x9d\n\t.uleb128 2\n",	/* offset fp */
+	  i, i, i, i, i, i, i, name, size);
+      for (r = 19; r <= 28; r++)  /* offset x19-x28 */
+	fprintf(ctx->fp, "\t.byte 0x%x\n\t.uleb128 %d\n", 0x80+r, r-16);
+      for (r = 8; r <= 15; r++)  /* offset d8-d15 */
+	fprintf(ctx->fp, "\t.byte 5\n\t.uleb128 0x%x\n\t.uleb128 %d\n", 64+r, r+5);
+      fprintf(ctx->fp,
+	  "\t.align 3\n"
+	  "LEFDE%d:\n\n",
+	  i);
+    }
+#if LJ_HASFFI
+    if (fcsize) {
+      fprintf(ctx->fp,
+	  "EH_frame2:\n"
+	  "\t.set L$set$y,LECIEY-LSCIEY\n"
+	  "\t.long L$set$y\n"
+	  "LSCIEY:\n"
+	  "\t.long 0\n"
+	  "\t.byte 0x1\n"
+	  "\t.ascii \"zR\\0\"\n"
+	  "\t.uleb128 0x1\n"
+	  "\t.sleb128 -8\n"
+	  "\t.byte 30\n"			/* Return address is in lr. */
+	  "\t.uleb128 1\n"			/* augmentation length */
+	  "\t.byte 0x1b\n"			/* pcrel|sdata4 */
+	  "\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 16\n"	/* def_cfa fp 16 */
+	  "\t.align 3\n"
+	  "LECIEY:\n\n");
+      fprintf(ctx->fp,
+	  "_lj_vm_ffi_call.eh:\n"
+	  "LSFDEY:\n"
+	  "\t.set L$set$yy,LEFDEY-LASFDEY\n"
+	  "\t.long L$set$yy\n"
+	  "LASFDEY:\n"
+	  "\t.long LASFDEY-EH_frame2\n"
+	  "\t.long _lj_vm_ffi_call-.\n"
+	  "\t.long %d\n"
+	  "\t.uleb128 0\n"			/* augmentation length */
+	  "\t.byte 0x9e\n\t.uleb128 1\n"	/* offset lr */
+	  "\t.byte 0x9d\n\t.uleb128 2\n"	/* offset fp */
+	  "\t.byte 0x93\n\t.uleb128 3\n"	/* offset x19 */
+	  "\t.byte 0x94\n\t.uleb128 4\n"	/* offset x20 */
+	  "\t.align 3\n"
+	  "LEFDEY:\n\n", fcsize);
+    }
+#endif
+    fprintf(ctx->fp, ".subsections_via_symbols\n");
+    }
+    break;
+#endif
   default:
     break;
   }
