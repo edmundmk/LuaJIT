@@ -3645,6 +3645,16 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  cmp CARG1w, CARG2w
     }
     |1:
+#if LJ_ZERO_BASED
+    if (op == BC_FORI) {
+      |  csel PC, RC, PC, ge
+    } else if (op == BC_JFORI) {
+      |  mov PC, RC
+      |  ldrh RCw, [RC, #-4+OFS_RD]
+    } else if (op == BC_IFORL) {
+      |  csel PC, RC, PC, lt
+    }
+#else
     if (op == BC_FORI) {
       |  csel PC, RC, PC, gt
     } else if (op == BC_JFORI) {
@@ -3653,15 +3663,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     } else if (op == BC_IFORL) {
       |  csel PC, RC, PC, le
     }
+#endif
     if (vk) {
       |   str TMP0, FOR_IDX
       |   str TMP0, FOR_EXT
     } else {
       |  str CARG1, FOR_EXT
     }
+#if LJ_ZERO_BASED
+    if (op == BC_JFORI || op == BC_JFORL) {
+      |  blt =>BC_JLOOP
+    }
+#else
     if (op == BC_JFORI || op == BC_JFORL) {
       |  ble =>BC_JLOOP
     }
+#endif
     |2:
     |   ins_next
     |
