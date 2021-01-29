@@ -4396,6 +4396,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       }
       |  cmp RBd, TMPRd
       |  mov FOR_EXT, RB
+#if LJ_ZERO_BASED
+      if (op == BC_FORI) {
+	|  jl >7
+	|1:
+	|6:
+	|  branchPC RD
+      } else if (op == BC_JFORI) {
+	|  branchPC RD
+	|  movzx RDd, PC_RD
+	|  jl =>BC_JLOOP
+	|1:
+	|6:
+      } else if (op == BC_IFORL) {
+	|  jge >7
+	|6:
+	|  branchPC RD
+	|1:
+      } else {
+	|  jl =>BC_JLOOP
+	|1:
+	|6:
+      }
+#else
       if (op == BC_FORI) {
 	|  jle >7
 	|1:
@@ -4417,6 +4440,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 	|1:
 	|6:
       }
+#endif
       |7:
       |  ins_next
       |
@@ -4431,6 +4455,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       }
       |  cmp RBd, TMPRd
       |  mov FOR_EXT, RB
+#if LJ_ZERO_BASED
+      if (op == BC_FORI) {
+	|  jg <7
+      } else if (op == BC_JFORI) {
+	|  branchPC RD
+	|  movzx RDd, PC_RD
+	|  jg =>BC_JLOOP
+      } else if (op == BC_IFORL) {
+	|  jle <7
+      } else {
+	|  jg =>BC_JLOOP
+      }
+#else
       if (op == BC_FORI) {
 	|  jge <7
       } else if (op == BC_JFORI) {
@@ -4442,6 +4479,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       } else {
 	|  jge =>BC_JLOOP
       }
+#endif
       |  jmp <6
       |9:  // Fallback to FP variant.
       if (!vk) {
